@@ -18,6 +18,9 @@ pip install boto3 echopype
 python3 dataset_pull.py <bucket> <prefix> <destination_directory>
 python3 transducer_settings.py <path_to_raw_file>
 ```
+## CI Testing
+
+At our current stage, we have little to do CI tests on because we are primarily doing data exploration. In the future, CI testing will look like ensuring the pipeline from data ingestion to model output runs without failing. 
 
 ## Contributing
 
