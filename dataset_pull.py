@@ -33,7 +33,7 @@ def download_raw_folder(bucket_name, s3_prefix, local_dir):
                 
 def main():
     if len(sys.argv) < 4:
-        print("Correct command is: python3 download_raws.py <bucket> <prefix> <destination_directory>")
+        print("Correct command is: python3 dataset_pull.py <bucket> <prefix> <destination_directory>")
         sys.exit(1)
         
     bucket = sys.argv[1]
