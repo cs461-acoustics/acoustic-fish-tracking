@@ -9,7 +9,7 @@ This repository currently provides tools for downloading and organizing acoustic
 Clone this repo and run the following commands to download the necessary libraries.
 
 ```bash
-pip install boto3 echopype
+pip install boto3 echopype matplotlib
 ```
 
 ## Usage
@@ -17,6 +17,7 @@ pip install boto3 echopype
 ```bash
 python3 dataset_pull.py <bucket> <prefix> <destination_directory>
 python3 transducer_settings.py <path_to_raw_file>
+python3 plot_echogram.py <path_to_raw_file> [-o output.png]
 ```
 ## CI Testing
 
