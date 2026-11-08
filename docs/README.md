@@ -48,17 +48,19 @@ python3 train.py dataset/data.yaml
 
 Weights are saved to `runs/fish/weights/best.pt`. Use `--model yolo11s.pt` to try the larger model.
 
+The trained YOLO11n model behind the results below is committed at `models/yolo11n_fish.pt`, so you can count fish without training. Swap in `runs/fish/weights/best.pt` to use your own run.
+
 Count and score one echogram on its held-out pings (`--xmin 448` keeps only the last 30% of a 640 px image):
 
 ```bash
-python3 count_fish.py training_data/<image>.png --weights runs/fish/weights/best.pt --conf 0.25 --labels project_annotations_yolo/labels/<label>.txt --xmin 448
+python3 count_fish.py training_data/<image>.png --weights models/yolo11n_fish.pt --conf 0.25 --labels project_annotations_yolo/labels/<label>.txt --xmin 448
 python3 baseline_threshold.py training_data/<image>.png --labels project_annotations_yolo/labels/<label>.txt --xmin 448
 ```
 
 Make comparison pictures for every labeled image (saved to `comparisons/`):
 
 ```bash
-python3 visualize.py training_data project_annotations_yolo/labels --weights runs/fish/weights/best.pt
+python3 visualize.py training_data project_annotations_yolo/labels --weights models/yolo11n_fish.pt
 ```
 
 First results on the held-out pings of the six labeled echograms (267 labeled fish): YOLO11n at confidence 0.25 counted 262 fish, found 72% of the labeled fish, and 73% of its detections were real fish. The threshold baseline counted 118 and found 5-34% per image. These numbers are a first estimate, since the test pings come from the same recordings used for training.
