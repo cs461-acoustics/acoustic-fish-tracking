@@ -218,3 +218,15 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# project data and generated outputs
+raw/
+raw2/
+runs/
+dataset/
+comparisons/
+output/
+output2/
+yolo11n.pt
+yolo11s.pt
+.DS_Store
