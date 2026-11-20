@@ -26,6 +26,22 @@ python3 transducer_settings.py <path_to_raw_file>
 python3 plot_echogram.py <path_to_raw_file> [-o output.png]
 ```
 
+for data with the .nc (NetCDF) extension, utilize the code located in `convert_nc_data/`. 
+Place your nc files in `NC_data/`, then run 
+
+```bash
+python3 convert_nc.py
+```
+For the raw data to be converted to an echogram image for training/testing. Output will be stored in `Echograms/`
+For a range compensated version of the echogram run the command: 
+
+```bash
+python3 rangecomp_convert_nc.py
+```
+
+Output will be stored in `RangeCompEchograms/`
+
+
 ## Fish Counting Pipeline
 
 The pipeline uses the labeled echograms in `training_data/` (grayscale 70 kHz PNGs) and their YOLO-format box labels in `project_annotations_yolo/labels/`, exported from Label Studio.
