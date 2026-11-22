@@ -227,6 +227,8 @@ dataset/
 comparisons/
 output/
 output2/
+new_images/
+prelabels.json
 yolo11n.pt
 yolo11s.pt
 .DS_Store
