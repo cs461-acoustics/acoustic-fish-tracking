@@ -46,6 +46,17 @@ python3 build_dataset.py training_data project_annotations_yolo/labels dataset
 python3 train.py dataset/data.yaml
 ```
 
+To visualize the dataset that was built using the build_dataset program, run the following command 
+which will create a folder titled "dataset_visualization" that contains an html file with a visual represenation
+of the tiles, overlaps, and bounding boxes:
+
+```bash
+python3 visualize_dataset.py training_data project_annotations_yolo/labels dataset --out dataset_visualization
+```
+
+If `processed_dataset/` exists, its image tiles and matching density maps are included automatically; use
+`--processed-dir <path>` to specify a different location.
+
 Weights are saved to `runs/fish/weights/best.pt`. Use `--model yolo11s.pt` to try the larger model.
 
 The trained YOLO11n model behind the results below is committed at `models/yolo11n_fish.pt`, so you can count fish without training. Swap in `runs/fish/weights/best.pt` to use your own run.

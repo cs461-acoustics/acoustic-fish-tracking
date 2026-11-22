@@ -1,4 +1,4 @@
-#cut labeled echograms into overlapping tiles and split train/val by time (x axis)
+#cut labeled echograms into overlapping tiles and split train/val by time (x axis)agent-host-copilotcli:/5bb577fb-1200-459a-a1c0-5f344a0877f6
 #pass a whole folder (python build_dataset.py training_data project_annotations_yolo/labels dataset)
 #or a single image (python build_dataset.py <image> <labels.txt> <out folder>)
 import argparse
@@ -13,6 +13,25 @@ def tiles(W, H, t, s):
     if xs[-1] + t < W: xs.append(W - t)
     if ys[-1] + t < H: ys.append(H - t)
     return [(x, y) for y in ys for x in xs]
+
+def tile_boxes(boxes, tx, ty, split_x, tw, th):
+    kept, dropped = [], []
+    
+    #move each box into tile coordinates and clip it to the tile edge
+    for x0, y0, x1, y1 in boxes:
+        x0, x1 = x0 - split_x - tx, x1 - split_x - tx
+        y0, y1 = y0 - ty, y1 - ty
+        cx0, cy0, cx1, cy1 = max(x0, 0), max(y0, 0), min(x1, tw), min(y1, th)
+        if cx1 <= cx0 or cy1 <= cy0:
+            continue
+
+        #drop slivers, boxes with less than 40% left inside the tile
+        clipped = (cx0, cy0, cx1, cy1)
+        if (cx1 - cx0) * (cy1 - cy0) < 0.4 * (x1 - x0) * (y1 - y0):
+            dropped.append(clipped)
+        else:
+            kept.append(clipped)
+    return kept, dropped
 
 def build(image, labels, out_dir, tile, stride, val_frac):
     im = Image.open(image).convert("RGB"); W, H = im.size
@@ -29,20 +48,12 @@ def build(image, labels, out_dir, tile, stride, val_frac):
         pw, ph = part.size; n_t = n_b = 0
         for tx, ty in tiles(pw, ph, tile, stride):
             tw, th = min(tile, pw), min(tile, ph)
-            lines = []
-
-            #move each box into tile coordinates and clip it to the tile edge
-            for x0, y0, x1, y1 in boxes:
-                x0, x1 = x0 - offs[split] - tx, x1 - offs[split] - tx
-                y0, y1 = y0 - ty, y1 - ty
-                cx0, cy0, cx1, cy1 = max(x0, 0), max(y0, 0), min(x1, tw), min(y1, th)
-                if cx1 <= cx0 or cy1 <= cy0:
-                    continue
-
-                #drop slivers, boxes with less than 40% left inside the tile
-                if (cx1 - cx0) * (cy1 - cy0) < 0.4 * (x1 - x0) * (y1 - y0):
-                    continue
-                lines.append(f"0 {(cx0+cx1)/2/tw:.6f} {(cy0+cy1)/2/th:.6f} {(cx1-cx0)/tw:.6f} {(cy1-cy0)/th:.6f}")
+            kept, _ = tile_boxes(boxes, tx, ty, offs[split], tw, th)
+            lines = [
+                f"0 {(x0+x1)/2/tw:.6f} {(y0+y1)/2/th:.6f} "
+                f"{(x1-x0)/tw:.6f} {(y1-y0)/th:.6f}"
+                for x0, y0, x1, y1 in kept
+            ]
 
             #save the tile image and its label file
             name = f"{stem}_{split}_x{tx}_y{ty}"

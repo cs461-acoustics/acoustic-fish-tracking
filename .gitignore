@@ -230,3 +230,4 @@ output2/
 yolo11n.pt
 yolo11s.pt
 .DS_Store
+dataset_visualization/
