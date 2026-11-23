@@ -1,0 +1,153 @@
+# acoustic-fish-tracking
+
+This project explores the use of AI and machine learning to estimate mesopelagic fish abundance from broadband echosounder data collected by autonomous, moored acoustic platforms. These systems continuously record echoes from fish and zooplankton, generating massive acoustic datasets that can reveal population dynamics and behavior at unprecedented temporal scales. A key challenge is accurately associating individual detections across successive pings to maintain fish identities when trajectories intersect, overlap, or temporarily merge, situations that often cause traditional tracking methods to fail. The goal of this project is to create a computer vision model that can associate fish tracks for fish counting. 
+
+This repository currently provides tools for downloading and organizing acoustic datasets and generating summary statistics from raw recording files, plus a first fish counting pipeline: a YOLO object detector trained on hand-labeled echograms, and a simple brightness-threshold baseline to compare it against. This is the foundation for future machine learning models that can improve fish counting, track disambiguation, and 3D trajectory reconstruction.
+
+## Installation
+
+Clone this repo and run the following commands to download the necessary libraries.
+
+```bash
+pip install boto3 echopype matplotlib
+```
+
+For the fish counting pipeline, install its requirements (ultralytics also installs PyTorch):
+
+```bash
+pip install -r requirements.txt
+```
+
+## Usage
+
+```bash
+python3 dataset_pull.py <bucket> <prefix> <destination_directory>
+python3 transducer_settings.py <path_to_raw_file>
+python3 plot_echogram.py <path_to_raw_file> [-o output.png]
+```
+
+for data with the .nc (NetCDF) extension, utilize the code located in `convert_nc_data/`. 
+Place your nc files in `NC_data/`, then run 
+
+```bash
+python3 convert_nc.py
+```
+For the raw data to be converted to an echogram image for training/testing. Output will be stored in `Echograms/`
+For a range compensated version of the echogram run the command: 
+
+```bash
+python3 rangecomp_convert_nc.py
+```
+
+Output will be stored in `RangeCompEchograms/`
+
+
+## Fish Counting Pipeline
+
+The pipeline uses the labeled echograms in `training_data/` (grayscale 70 kHz PNGs) and their YOLO-format box labels in `project_annotations_yolo/labels/`, exported from Label Studio.
+
+| File | What it does |
+|---|---|
+| `build_dataset.py` | Splits each echogram by time (first 70% of pings for training, last 30% held out) and cuts it into overlapping 320 px tiles for YOLO |
+| `train.py` | Fine-tunes a YOLO11 detector on the tiles (YOLO11n by default, runs on CPU) |
+| `count_fish.py` | Counts fish in a full echogram with the trained model, and scores it against labels if given |
+| `baseline_threshold.py` | Baseline counter: keeps bright pixels and counts each connected blob as one fish |
+| `visualize.py` | Saves side-by-side pictures of the labels, model predictions, and threshold baseline |
+| `prelabel.py` | Runs the trained model on unlabeled echograms and saves its boxes as Label Studio pre-labels |
+| `common.py` | Shared helpers for reading labels, pairing them with images, and scoring |
+
+Build the dataset and train:
+
+```bash
+python3 build_dataset.py training_data project_annotations_yolo/labels dataset
+python3 train.py dataset/data.yaml
+```
+
+To visualize the dataset that was built using the build_dataset program, run the following command 
+which will create a folder titled "dataset_visualization" that contains an html file with a visual represenation
+of the tiles, overlaps, and bounding boxes:
+
+```bash
+python3 visualize_dataset.py training_data project_annotations_yolo/labels dataset --out dataset_visualization
+```
+
+If `processed_dataset/` exists, its image tiles and matching density maps are included automatically; use
+`--processed-dir <path>` to specify a different location.
+
+Weights are saved to `runs/fish/weights/best.pt`. Use `--model yolo11s.pt` to try the larger model.
+
+The trained YOLO11n model behind the results below is committed at `models/yolo11n_fish.pt`, so you can count fish without training. Swap in `runs/fish/weights/best.pt` to use your own run.
+
+Count and score one echogram on its held-out pings (`--xmin 448` keeps only the last 30% of a 640 px image):
+
+```bash
+python3 count_fish.py training_data/<image>.png --weights models/yolo11n_fish.pt --conf 0.25 --labels project_annotations_yolo/labels/<label>.txt --xmin 448
+python3 baseline_threshold.py training_data/<image>.png --labels project_annotations_yolo/labels/<label>.txt --xmin 448
+```
+
+Make comparison pictures for every labeled image (saved to `comparisons/`):
+
+```bash
+python3 visualize.py training_data project_annotations_yolo/labels --weights models/yolo11n_fish.pt
+```
+
+First results on the held-out pings of the six labeled echograms (267 labeled fish): YOLO11n at confidence 0.25 counted 262 fish, found 72% of the labeled fish, and 73% of its detections were real fish. The threshold baseline counted 118 and found 5-34% per image. These numbers are a first estimate, since the test pings come from the same recordings used for training.
+
+## Pre-labeling New Data in Label Studio
+
+`prelabel.py` runs the trained model on a folder of unlabeled echogram PNGs and saves its boxes as Label Studio pre-labels, so labelers only fix boxes instead of drawing every one. It uses a lower confidence cutoff (0.2) than counting, since deleting a wrong box is faster than drawing a missed one.
+
+```bash
+python3 prelabel.py <image_folder> --weights models/yolo11n_fish.pt
+```
+
+This writes `prelabels.json`. The images should look like `training_data/` (grayscale, dark background, fish about the same pixel size), or the model will miss more fish. Run it from the repo folder, and keep the image folder inside the repo so Label Studio can find the images.
+
+Install Label Studio in its own environment, since its dependencies can conflict with ultralytics:
+
+```bash
+conda create -n labelstudio python=3.12 -y
+conda activate labelstudio
+pip install label-studio
+```
+
+Start it from the repo folder with local file serving turned on (replace the path with your repo's full path):
+
+```bash
+LABEL_STUDIO_LOCAL_FILES_SERVING_ENABLED=true \
+LABEL_STUDIO_LOCAL_FILES_DOCUMENT_ROOT=/full/path/to/acoustic-fish-tracking \
+label-studio start
+```
+
+Then in Label Studio (http://localhost:8080):
+
+1. Create a project. Under Labeling Setup, choose Custom template, switch to the Code view, and paste this config (it matches the names used for the original labels):
+
+   ```xml
+   <View>
+     <Image name="image" value="$Image"/>
+     <RectangleLabels name="label" toName="image">
+       <Label value="fish" background="green"/>
+     </RectangleLabels>
+   </View>
+   ```
+
+2. In the project's Settings, go to Cloud Storage, then Add Source Storage. Choose Local files and enter the full path of the image folder. Click Add Storage, but do not click Sync, which would create duplicate tasks without the pre-labels.
+3. In Settings, under Annotation, turn on "Use predictions to prelabel tasks".
+4. Click Import and upload `prelabels.json`. Each image becomes a task with the model's boxes on it.
+5. Open each task, fix the boxes (move or resize them, delete wrong ones, draw missed fish), and click Submit.
+6. When done, click Export and choose YOLO. The `labels/` folder in the export pairs with the images and can be used with `build_dataset.py` like `project_annotations_yolo/labels/`.
+
+If you regenerate the images or pre-labels, delete the old tasks in the project and import the new `prelabels.json`, since the old boxes are stored with the old image sizes.
+
+## CI Testing
+
+At our current stage, we have little to do CI tests on because we are primarily doing data exploration. In the future, CI testing will look like ensuring the pipeline from data ingestion to model output runs without failing. 
+
+## Contributing
+
+This is an ongoing project. Pull requests are closed to only current contributors.
+
+## License
+
+[MIT](https://choosealicense.com/licenses/mit/)
